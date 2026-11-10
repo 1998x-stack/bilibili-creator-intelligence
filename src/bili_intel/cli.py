@@ -9,6 +9,7 @@ from pathlib import Path
 from .config import Settings
 from .db import Database
 from .pipeline import process_video
+from .scheduler import run_batch
 from .sources import ManifestSource, YtDlpSpaceSource
 from .urltools import extract_mid
 
@@ -28,6 +29,14 @@ def _process_options(p: argparse.ArgumentParser) -> None:
     p.add_argument('--no-llm', action='store_true')
     p.add_argument('--metadata-only', action='store_true', help='Disable subtitle, ASR and LLM stages')
     p.add_argument('--limit', type=int, default=0, help='Maximum existing videos to process; 0=all')
+    p.add_argument('--workers', type=int, default=None, help='Video worker count (default from .env)')
+    p.add_argument('--network-workers', type=int, default=None, help='Shared concurrent downloads')
+    p.add_argument('--asr-workers', type=int, default=None, help='Concurrent model calls')
+    p.add_argument('--llm-workers', type=int, default=None, help='Concurrent LLM requests')
+    p.add_argument('--max-attempts', type=int, default=3, help='Durable per-video attempts')
+    p.add_argument('--max-wait-seconds', type=float, default=0, help='0=run until batch terminal')
+    p.add_argument('--retry-failed', action='store_true', help='Explicitly requeue exhausted tasks')
+    p.add_argument('--queue-only', action='store_true', help='Persist tasks without executing them')
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument('--mid', required=True)
     export.add_argument('--output', required=True, type=Path)
     sub.add_parser('stats')
+    sub.add_parser('queue-status', help='Print durable task status counts')
+    sub.add_parser('costs', help='Print LLM API token usage and estimated costs')
+    search = sub.add_parser('search', help='Search transcript segment text (FTS5 trigram)')
+    search.add_argument('phrase')
+    search.add_argument('--limit', type=int, default=20)
     return parser
 
 
@@ -85,27 +99,18 @@ def _discover(db: Database, args, settings: Settings) -> tuple[str, list[str]]:
 
 
 def _process_rows(db: Database, rows, settings, args) -> None:
-    if args.limit < 0:
-        raise ValueError('--limit must be >= 0')
-    if args.limit:
-        rows = rows[:args.limit]
-    failures = []
-    for row in rows:
-        print(f"==> {row['video_id']} {row['title']}")
-        try:
-            process_video(
-                db, row, settings,
-                authorized_content_use=args.authorized_content_use,
-                fetch_metadata=not args.no_metadata,
-                fetch_subtitles=not(args.no_subtitles or args.metadata_only),
-                run_asr=not(args.no_asr or args.metadata_only),
-                run_llm=not(args.no_llm or args.metadata_only),
-            )
-        except Exception as exc:
-            failures.append((row['video_id'], type(exc).__name__))
-            print(f"FAILED {row['video_id']}: {exc}", file=sys.stderr)
-    if failures:
-        raise RuntimeError(f'{len(failures)} videos failed: {failures}; successful data is retained')
+    for name in ('workers','network_workers','asr_workers','llm_workers'):
+        value = getattr(args,name,None)
+        if value is not None and value < 1:
+            raise ValueError(f'--{name.replace("_","-")} must be positive')
+    if args.max_attempts < 1:
+        raise ValueError('--max-attempts must be positive')
+    if args.max_wait_seconds < 0:
+        raise ValueError('--max-wait-seconds must be non-negative')
+    status = run_batch(db, rows, settings, args)
+    print('Queue result:', json.dumps(status,ensure_ascii=False))
+    if not args.queue_only and (status.get('failed') or status.get('pending') or status.get('running')):
+        raise RuntimeError(f'Processing incomplete: {status}; resume with bci process')
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,6 +144,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f'Exported {count} videos to {args.output}')
         elif args.command == 'stats':
             print(json.dumps(db.counts(), ensure_ascii=False, indent=2))
+        elif args.command == 'queue-status':
+            from .queue import WorkQueue
+            print(json.dumps(WorkQueue(db).summary(), ensure_ascii=False, indent=2))
+        elif args.command == 'costs':
+            print(json.dumps(db.llm_cost_summary(), ensure_ascii=False, indent=2))
+        elif args.command == 'search':
+            print(json.dumps(db.search_segments(args.phrase,args.limit),ensure_ascii=False,indent=2))
     except Exception as exc:
         print(f'ERROR: {exc}', file=sys.stderr)
         return 1

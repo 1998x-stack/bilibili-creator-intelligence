@@ -3,6 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from dataclasses import dataclass
+
+from .security import sanitize_metadata
+
+
+@dataclass(frozen=True)
+class SubtitleFile:
+    path: Path
+    language: str
+    source_group: str
 
 
 SUBTITLE_LANGS = ["zh-Hans", "zh-CN", "zh", "ai-zh", "zh-Hant", "en", "ai-en"]
@@ -63,7 +73,7 @@ def list_subtitle_tracks(url: str, settings) -> list[dict[str, Any]]:
     return tracks
 
 
-def download_subtitles(url: str, settings, output_dir: Path) -> list[Path]:
+def download_subtitles(url: str, settings, output_dir: Path) -> list[SubtitleFile]:
     """Inspect then download available subtitle tracks only; no full video is downloaded."""
     try:
         import yt_dlp
@@ -93,7 +103,16 @@ def download_subtitles(url: str, settings, output_dir: Path) -> list[Path]:
     }
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
-    return sorted(output_dir.glob("*.srt")) + sorted(output_dir.glob("*.vtt"))
+    files = sorted(output_dir.glob('*.srt')) + sorted(output_dir.glob('*.vtt'))
+    result = []
+    for path in files:
+        known = next((t for t in tracks if f'.{t["language"]}.' in path.name), None)
+        result.append(SubtitleFile(
+            path=path,
+            language=known['language'] if known else 'und',
+            source_group=known['source_group'] if known else 'unknown',
+        ))
+    return result
 
 
 def download_audio(url: str, settings, output_dir: Path) -> Path:
@@ -151,10 +170,11 @@ def info_to_video_update(
         'coin_count', 'favorite_count', 'share_count', 'danmaku_count',
         'comment_count', 'thumbnail', 'aid',
     )
-    raw = {key: info[key] for key in SAFE_META_KEYS if key in info}
+    raw = sanitize_metadata({key: info[key] for key in SAFE_META_KEYS if key in info})
     return {
         "video_id": video_id,
-        "bvid": extracted_id if extracted_id.startswith("BV") else (info.get("display_id") if str(info.get("display_id", "")).startswith("BV") else None),
+        "bvid": (video_id if video_id.startswith("BV") and len(video_id)==12 else
+                 extracted_id if extracted_id.startswith("BV") and len(extracted_id)==12 else None),
         "aid": (str(info.get("id"))[2:] if str(info.get("id", "")).startswith("av") else info.get("aid")),
         "creator_mid": creator_mid,
         "title": info.get("title") or "",

@@ -1,16 +1,23 @@
-# Verification matrix (2026-11-10)
+# Verification matrix — v0.3.0 (2026-11-10)
 
-This file separates **verified source capabilities** from **locally tested behavior** and **not-yet-verified live integration**.
+Only offline simulated behavior is automated in CI; real Bilibili content, model weights, GPU environment and paid LLM API access are **not** exercised.
 
-| Stage | Evidence | Local automated checks | Live limitations |
+| Feature | Implemented source | Offline checks | Live caveat |
 | --- | --- | --- | --- |
-| Space URL → creator MID | Local URL validation code | Accepts known MID format, rejects wrong hosts | Does not verify MID exists |
-| yt-dlp space discovery | [SupportedSites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) lists `BilibiliSpaceVideo`; [extractor source](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py) contains its playlist logic | Fake playlist, dedupe, MID consistency, cap, incomplete/malformed rejection | Can receive 352/412, inaccessible uploads missing, live E2E not run |
-| Official API authorization | [Official single archive API](https://openhome.bilibili.com/doc/4/d9554788-dcef-f139-6217-b487d41c3826) requires `ARC_BASE` and user consent; [mirrored list API](https://bilibili.apifox.cn/api-23727647) | Official adapter intentionally not called or falsely simulated | Requires registered app, approved scopes, signed headers |
-| Metrics and SQLite | yt-dlp [Bilibili extractor source](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py) exposes likes/views/comments | Sparse merge, missing is NULL, zero is zero, snapshots, JSONL export | `coin/favorite/share` often unavailable from yt-dlp |
-| Subtitles | [yt-dlp subtitles documentation](https://github.com/yt-dlp/yt-dlp#subtitle-options); [Bilibili AI subtitle issue](https://github.com/yt-dlp/yt-dlp/issues/14463) | SRT/VTT parser, generated timecodes, mocked subtitle preference | Actual subtitle availability varies; login may be required |
-| Audio + ASR | [yt-dlp FFmpeg](https://github.com/yt-dlp/yt-dlp), [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Mocked fallback when no subtitles | No real audio downloaded; ffmpeg/weights/hardware untested |
-| LLM synthesis | [OpenAI JSON response documentation](https://platform.openai.com/docs/guides/structured-outputs) | Bounded transcript chunks, JSON contract validation, mocked cache | Model compatibility and output quality not tested live; JSON mode is not strict schema validation |
-| CI and packaging | Python setuptools project and GitHub Actions workflow in repo | `python -m pytest -q`; `python -m compileall -q src` | CI must run on GitHub for cross-version verification |
+| Space discovery | `sources.py`, yt-dlp `BilibiliSpaceVideo` | Mocked playlist normalization, cap, audit | Unauthorized/private/hidden uploads may be missing; 352/412 possible |
+| Multi-P completeness | `parts.py`, `pipeline.py`, `db.py` | Two-part assembly, malformed inventory, missing part prevents completion | Actual Bilibili pagination/cid access needs authorized E2E |
+| Whisper model cache | `asr.py` | Monkeypatched model constructor reused | Local CPU/GPU memory and latency unbenchmarked |
+| Durable queue | `queue.py`, `scheduler.py` | Concurrent atomic claims, lease renewal/fencing, exhaustion/retry | External side effects not exactly-once; multi-process workloads require stress tests |
+| Token chunking and schema | `llm.py` with tiktoken, Pydantic | Unicode chunk round trip with fake encoder, strict missing-key rejection, fake API usage | Provider/model JSON Schema support not validated live |
+| RPM/TPM and cost | `runtime.py`, `llm.py`, `llm_usage` | Fake API and usage accounting | Process-local only; billed failures may be unavailable; prices user supplied |
+| Subtitle selection | `pipeline._choose_subtitle`, `SubtitleFile` | Source metadata + cue quality and fallback in local test | Coverage proxy is not measured accuracy |
+| Search/exports | `transcript_segments_fts`, `db.export_jsonl` | Chinese search and latest transcript-to-analysis consistency | Legacy v0.2 transcripts not automatically backfilled |
+| Metadata redaction | `security.sanitize_metadata` | Provider payload field allowlisting | Formal security review recommended |
 
-The automated test suite deliberately requires no credentials, network or LLM billing. Live behavior must be validated separately using an authorized creator and a small sample, starting with `bci discover` and `bci run --max-videos 1 --metadata-only`.
+Authoritative references:
+- [yt-dlp Bilibili extractor](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py) (includes anthology page lists via `x/player/pagelist` and `?p=` links).
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper): model caching and `vad_filter` usage.
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs): Schema strict vs JSON mode.
+- [SQLite WAL](https://www.sqlite.org/wal.html) and [FTS5 trigram tokenizer](https://www.sqlite.org/fts5.html).
+
+Run: `python -m compileall -q src && python -m pytest -q` with no remote credentials. For a live smoke test with proper rights, start with `bci run --max-videos 1 --metadata-only --authorized-content-use` and only then enable ASR/LLM for one short submission.
