@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bilibili-creator-intelligence"
+version = "0.2.0"
+description = "A local-first pipeline for authorized Bilibili creator video metadata, transcripts, and LLM knowledge extraction."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Bilibili Creator Intelligence contributors" }]
+dependencies = [
+  "yt-dlp>=2025.10.22",
+  "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+llm = ["openai>=1.68.0"]
+asr = ["faster-whisper>=1.1.0"]
+dev = ["pytest>=8.0", "ruff>=0.9"]
+all = ["openai>=1.68.0", "faster-whisper>=1.1.0"]
+
+[project.scripts]
+bci = "bili_intel.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.setuptools.package-data]
+bili_intel = ["prompts/*.md"]
