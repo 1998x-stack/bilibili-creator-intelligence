@@ -138,3 +138,21 @@ def test_llm_parser_rejects_bad_shape():
         _validate_result('[]')
     with pytest.raises(ValueError, match='must be a list'):
         _validate_result('{"tags":"bad"}')
+
+
+def test_run_processes_only_this_discovery_not_historical_rows(tmp_path, monkeypatch):
+    monkeypatch.setenv('BCI_DB_PATH', str(tmp_path / 'state.db'))
+    monkeypatch.setenv('BCI_ARTIFACTS_DIR', str(tmp_path / 'artifacts'))
+    db = make_db(tmp_path)
+    second = 'BV1aa411c7mD'
+    csv_path = tmp_path / 'one.csv'
+    with csv_path.open('w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['video_url'])
+        writer.writeheader()
+        writer.writerow({'video_url': f'https://www.bilibili.com/video/{second}/'})
+    processed = []
+    monkeypatch.setattr(cli, 'process_video', lambda db, video, settings, **kwargs: processed.append(video['video_id']))
+    assert cli.main(['run', '--space-url', SPACE, '--manifest', str(csv_path),
+                     '--no-metadata', '--no-subtitles', '--no-asr', '--no-llm']) == 0
+    assert processed == [second]
+    assert db.counts()['videos'] == 2

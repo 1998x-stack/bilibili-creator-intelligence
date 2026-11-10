@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _discover(db: Database, args, settings: Settings) -> str:
+def _discover(db: Database, args, settings: Settings) -> tuple[str, list[str]]:
     mid = extract_mid(args.space_url)
     source_kind = ('manifest' if args.manifest else 'yt-dlp') if args.source == 'auto' else args.source
     if source_kind == 'manifest':
@@ -81,7 +81,7 @@ def _discover(db: Database, args, settings: Settings) -> str:
     except Exception as exc:
         db.finish_discovery(run_id, 'failed', 0, {'error': type(exc).__name__, 'detail': str(exc)})
         raise
-    return mid
+    return mid, [video['video_id'] for video in videos]
 
 
 def _process_rows(db: Database, rows, settings, args) -> None:
@@ -124,8 +124,11 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == 'discover':
             _discover(db, args, settings)
         elif args.command == 'run':
-            mid = _discover(db, args, settings)
-            _process_rows(db, db.get_videos(creator_mid=mid), settings, args)
+            mid, discovered_ids = _discover(db, args, settings)
+            # Only process the rows discovered *this run*, not all historical creator videos.
+            # In particular, --max-videos must bound downstream ASR and LLM billing.
+            rows = [db.get_videos(video_id=video_id)[0] for video_id in discovered_ids]
+            _process_rows(db, rows, settings, args)
             print(json.dumps(db.counts(), ensure_ascii=False))
         elif args.command == 'process':
             if not args.mid.isdigit():

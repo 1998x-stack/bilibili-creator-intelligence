@@ -63,7 +63,7 @@ bci run \
   --metadata-only
 ```
 
-`--max-videos 0` (default) means **no caller-imposed cap**, *not* a completeness guarantee. A capped scan is explicitly marked incomplete in the discovery report. If access is rejected (e.g. 352/412), stop, review permissions and try the offline workflow rather than bypassing restrictions.
+`--max-videos 0` (default) means **no caller-imposed cap**, *not* a completeness guarantee. A capped scan is explicitly marked incomplete in the discovery report, and its downstream processing is bounded to the just-discovered videos. If access is rejected (e.g. 352/412), stop, review permissions and try the offline workflow rather than bypassing restrictions.
 
 ### B. Import an authorized CSV manifest (offline)
 
