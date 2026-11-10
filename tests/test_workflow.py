@@ -87,6 +87,8 @@ def test_metadata_safe_fields_do_not_keep_signed_stream_urls():
 
 def test_existing_subtitle_skips_asr_and_llm_cache(tmp_path, monkeypatch):
     db = make_db(tmp_path)
+    monkeypatch.setattr(pipeline, 'discover_parts', lambda video_id, settings: [
+        {'part_index':1,'url':URL,'title':'A','duration_seconds':4}])
     def subtitles(url, settings, directory):
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f'{BV}.ai-zh.srt'
@@ -110,6 +112,8 @@ def test_existing_subtitle_skips_asr_and_llm_cache(tmp_path, monkeypatch):
 
 def test_asr_fallback_when_no_subtitles(tmp_path, monkeypatch):
     db = make_db(tmp_path)
+    monkeypatch.setattr(pipeline, 'discover_parts', lambda video_id, settings: [
+        {'part_index':1,'url':URL,'title':'A','duration_seconds':4}])
     monkeypatch.setattr(pipeline, 'download_subtitles', lambda *args: [])
     monkeypatch.setattr(pipeline, 'download_audio', lambda *args: Path('audio.mp3'))
     monkeypatch.setattr(pipeline, 'transcribe_audio', lambda *args: (SRT, 'zh'))
@@ -151,7 +155,7 @@ def test_run_processes_only_this_discovery_not_historical_rows(tmp_path, monkeyp
         writer.writeheader()
         writer.writerow({'video_url': f'https://www.bilibili.com/video/{second}/'})
     processed = []
-    monkeypatch.setattr(cli, 'process_video', lambda db, video, settings, **kwargs: processed.append(video['video_id']))
+    monkeypatch.setattr(cli, 'run_batch', lambda db, rows, settings, args: [processed.append(row['video_id']) for row in rows] and {'completed':len(rows)})
     assert cli.main(['run', '--space-url', SPACE, '--manifest', str(csv_path),
                      '--no-metadata', '--no-subtitles', '--no-asr', '--no-llm']) == 0
     assert processed == [second]

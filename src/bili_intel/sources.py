@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .manifest import load_manifest
+from .security import sanitize_metadata
 from .urltools import canonical_video_url, extract_mid, extract_video_id
 
 
@@ -66,9 +67,7 @@ def normalize_playlist_entry(entry: dict[str, Any], creator_mid: str) -> dict[st
             'view_count', 'like_count', 'coin_count', 'favorite_count',
             'share_count', 'danmaku_count', 'comment_count',
         )},
-        'raw_metadata': {key: value for key, value in entry.items()
-                         if isinstance(value, (str, int, float, bool, list, dict, type(None)))
-                         and key not in {'formats', 'thumbnails', 'subtitles', 'automatic_captions'}},
+        'raw_metadata': sanitize_metadata(entry),
     }
 
 
