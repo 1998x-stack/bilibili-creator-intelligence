@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from bili_intel import diagnostics
 
 
