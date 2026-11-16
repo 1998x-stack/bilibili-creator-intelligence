@@ -1,7 +1,7 @@
 # 工程审查与迭代路线图
 
-**审查对象：** \`1998x-stack/bilibili-creator-intelligence\`  
-**审查基线：** \`main\` @ \`f6d02300abad7d2280c25798e22da9d41e3949ec\`（v0.3.0）  
+**审查对象：** `1998x-stack/bilibili-creator-intelligence`  
+**审查基线：** `main` @ `f6d02300abad7d2280c25798e22da9d41e3949ec`（v0.3.0）  
 **审查日期：** 2026-11-16
 
 ## 1. 总体判断
@@ -13,13 +13,13 @@
 ## 2. 当前架构
 
 1. **采集：** 授权空间 URL / CSV manifest；yt-dlp 空间发现；视频元数据和互动指标快照。
-2. **分 P：** yt-dlp 枚举 \`?p=N\`，写入 \`video_parts\`。
+2. **分 P：** yt-dlp 枚举 `?p=N`，写入 `video_parts`。
 3. **转录：** 优先下载字幕；字幕不可用时下载音频并调用 faster-whisper。
 4. **合并：** 所有分 P 都有转录后才生成完整 transcript 和时间戳 segments。
 5. **分析：** tiktoken 分块、Map-Reduce、Pydantic JSON Schema 校验。
-6. **调度：** SQLite \`work_items\`，租约、fencing token、heartbeat、重试和阶段信号量。
+6. **调度：** SQLite `work_items`，租约、fencing token、heartbeat、重试和阶段信号量。
 7. **持久化：** creators、videos、video_stats、parts、transcripts、analyses、llm_usage、FTS5。
-8. **接口：** \`bci\` CLI、JSONL 导出和 FTS5 搜索。
+8. **接口：** `bci` CLI、JSONL 导出和 FTS5 搜索。
 
 ## 3. 已经具备的工程优势
 
@@ -37,7 +37,7 @@
 
 ### P1 — 数据安全：统计原始 JSON 的白名单边界不一致
 
-manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象传入数据库。旧版 \`add_stats()\` 直接序列化整个 raw stats 对象，没有像 \`raw_metadata\` 一样做统一白名单过滤。
+manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象传入数据库。旧版 `add_stats()` 直接序列化整个 raw stats 对象，没有像 `raw_metadata` 一样做统一白名单过滤。
 
 **处理：** 在数据库写入边界过滤允许的统计键和标量值，并增加回归测试。后续所有来源都应复用同一个安全函数。
 
@@ -45,13 +45,13 @@ manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象�
 
 首次运行需要分别判断 Python、yt-dlp、FFmpeg、faster-whisper、LLM SDK、SQLite FTS5、Cookie 文件和输出目录。缺少单一入口会让用户在真正开始采集后才遇到依赖错误。
 
-**处理：** 增加 \`bci doctor\`，只做本地检查，不发起网络请求，不显示密钥。
+**处理：** 增加 `bci doctor`，只做本地检查，不发起网络请求，不显示密钥。
 
 ### P1 — 运行反馈：空视频列表可能被当成空任务
 
-\`process\` 查询不到指定 MID 的视频时，调度器可能返回空汇总，用户难以区分“没有数据”和“任务成功完成”。
+`process` 查询不到指定 MID 的视频时，调度器可能返回空汇总，用户难以区分“没有数据”和“任务成功完成”。
 
-**处理：** 对空输入显式失败，并提示先运行 \`bci discover\` 或 \`bci ingest\`。
+**处理：** 对空输入显式失败，并提示先运行 `bci discover` 或 `bci ingest`。
 
 ### P1 — LLM 缓存：没有纳入 Provider / Endpoint 身份
 
@@ -69,11 +69,11 @@ manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象�
 
 现有 jobs 是阶段事件记录，queue-status 主要展示状态数量。对首次使用和定位故障来说，还缺少每次 run 的耗时、失败阶段、重试次数、错误类型和产物位置汇总。
 
-**后续方案：** 增加 run_id / task_id 关联、结构化 JSON 日志、\`bci inspect\` 或 \`bci report\`。日志必须脱敏，不记录 Cookie、Authorization、签名 URL 或 API Key。
+**后续方案：** 增加 run_id / task_id 关联、结构化 JSON 日志、`bci inspect` 或 `bci report`。日志必须脱敏，不记录 Cookie、Authorization、签名 URL 或 API Key。
 
 ### P2 — Prompt 双份文件
 
-根目录 \`prompts/video_analysis.md\` 为 v1；运行时代码读取 \`src/bili_intel/prompts/video_analysis.md\` 的 v3。两份文件容易漂移。
+根目录 `prompts/video_analysis.md` 为 v1；运行时代码读取 `src/bili_intel/prompts/video_analysis.md` 的 v3。两份文件容易漂移。
 
 **后续方案：** 明确包内 Prompt 为唯一运行时权威源，删除无用途的旧副本或用自动同步测试约束；所有 Prompt 修改都要更新指纹与回归测试。
 
@@ -81,7 +81,7 @@ manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象�
 
 当前 CI 执行 compileall 和 pytest，但没有运行已声明为 dev 依赖的 Ruff，也没有覆盖率阈值或独立的依赖安全扫描。
 
-**后续方案：** 先清理 lint 告警，再加入 \`ruff check src tests\`；逐步补充 coverage、依赖扫描和 3.12 测试。
+**后续方案：** 先清理 lint 告警，再加入 `ruff check src tests`；逐步补充 coverage、依赖扫描和 3.12 测试。
 
 ### P2 — ASR 质量没有基准集
 
@@ -117,11 +117,11 @@ manifest 可以从原始 JSON 中提取统计字段，并把原始统计对象�
 
 ## 6. 本地真实运行的验收顺序
 
-1. \`bci doctor\`：本地依赖和目录检查。
-2. \`python -m compileall -q src && python -m pytest -q\`：离线回归。
-3. \`bci run ... --max-videos 1 --metadata-only\`：授权元数据发现。
-4. \`bci process ... --limit 1 --no-metadata --no-llm\`：字幕/ASR 与多 P 完整性。
-5. \`bci process ... --no-metadata --no-subtitles --no-asr\`：独立 LLM 分析。
-6. \`bci search\`、\`bci export\`、\`bci costs\`、\`bci queue-status\`：检索、导出、费用与恢复检查。
+1. `bci doctor`：本地依赖和目录检查。
+2. `python -m compileall -q src && python -m pytest -q`：离线回归。
+3. `bci run ... --max-videos 1 --metadata-only`：授权元数据发现。
+4. `bci process ... --limit 1 --no-metadata --no-llm`：字幕/ASR 与多 P 完整性。
+5. `bci process ... --no-metadata --no-subtitles --no-asr`：独立 LLM 分析。
+6. `bci search`、`bci export`、`bci costs`、`bci queue-status`：检索、导出、费用与恢复检查。
 
 真实 B站、Whisper 权重和付费 LLM 请求必须由操作者在有权限的本地环境验证。CI 离线测试不能替代这些检查。

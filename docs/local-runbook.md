@@ -5,10 +5,10 @@
 ## 0. 权限与隐私边界
 
 - 仅处理你有权访问、保存和分析的内容；遵守 B站平台规则、创作者授权和适用法律。
-- \`--authorized-content-use\` 是操作者声明，不会授予额外权限，也不会绕过登录、验证码、访问限制或风控。
+- `--authorized-content-use` 是操作者声明，不会授予额外权限，也不会绕过登录、验证码、访问限制或风控。
 - 默认只保存 SQLite、字幕、音频和分析产物，不下载完整 MP4。
-- \`--no-llm\` 可确保本次处理不把字幕文本发送到外部 LLM。
-- 不要把 \`.env\`、Cookie 文件、API Key、数据库、私人字幕或完整错误日志中的凭据提交到 GitHub。
+- `--no-llm` 可确保本次处理不把字幕文本发送到外部 LLM。
+- 不要把 `.env`、Cookie 文件、API Key、数据库、私人字幕或完整错误日志中的凭据提交到 GitHub。
 
 ## 1. 安装环境
 
@@ -43,7 +43,7 @@ bci doctor
 
 重点关注 Python、yt-dlp、FFmpeg、SQLite FTS5 trigram、faster-whisper、LLM SDK、API Key 和目录权限。
 
-\`bci doctor\` 不发起网络请求，不验证 B站 Cookie 是否有效，也不测试 LLM API 连通性。可选组件未安装时会显示警告；不使用相应功能时可以暂时忽略。
+`bci doctor` 不发起网络请求，不验证 B站 Cookie 是否有效，也不测试 LLM API 连通性。可选组件未安装时会显示警告；不使用相应功能时可以暂时忽略。
 
 ## 3. 先跑离线测试
 
@@ -81,7 +81,7 @@ bci process \
 
 这一步优先尝试可用字幕；字幕不可用时才尝试音频下载和 faster-whisper。首次 ASR 可能需要下载模型权重，耗时和内存占用会明显增加。
 
-如果只想验证原字幕，不想触发 ASR，可以额外加 \`--no-asr\`；但只要某一 P 没有合格字幕，该视频就会失败，不会生成伪造的“完整转录”。
+如果只想验证原字幕，不想触发 ASR，可以额外加 `--no-asr`；但只要某一 P 没有合格字幕，该视频就会失败，不会生成伪造的“完整转录”。
 
 检查结果：
 
@@ -95,7 +95,7 @@ FTS5 trigram 搜索至少需要 3 个字符。
 
 ## 6. 第三阶段：单独运行 LLM 分析
 
-先在 \`.env\` 配置服务商的 API Key、Base URL 和模型名，再运行：
+先在 `.env` 配置服务商的 API Key、Base URL 和模型名，再运行：
 
 ~~~bash
 bci process \
@@ -106,7 +106,7 @@ bci process \
   --no-asr
 ~~~
 
-默认 \`BCI_LLM_MODE=schema\` 要求服务商支持严格 JSON Schema Structured Outputs。若兼容服务不支持，需明确设置 \`BCI_LLM_MODE=json\`；输出仍会通过 Pydantic 校验。
+默认 `BCI_LLM_MODE=schema` 要求服务商支持严格 JSON Schema Structured Outputs。若兼容服务不支持，需明确设置 `BCI_LLM_MODE=json`；输出仍会通过 Pydantic 校验。
 
 查看费用记录：
 
@@ -137,13 +137,13 @@ bci process --mid 123456 --authorized-content-use --retry-failed
 请尽量一次提供：
 
 1. 完整执行命令（将 MID、Cookie 路径、私人 URL 和密钥脱敏）。
-2. \`bci doctor\` 输出。
+2. `bci doctor` 输出。
 3. 从第一条异常开始的完整 traceback，而不只是最后一行。
-4. \`bci queue-status\` 和 \`bci stats\` 输出。
+4. `bci queue-status` 和 `bci stats` 输出。
 5. 操作系统、CPU 架构、Python 版本。
 6. 出错阶段：发现视频、读取元数据、字幕下载、音频下载、Whisper、LLM、SQLite 或导出。
 
-**不要发送** \`.env\` 原文、Cookie、API Key、Authorization Header、私人视频地址、私人完整字幕或未经脱敏的网络请求日志。先发脱敏错误信息即可。
+**不要发送** `.env` 原文、Cookie、API Key、Authorization Header、私人视频地址、私人完整字幕或未经脱敏的网络请求日志。先发脱敏错误信息即可。
 
 ## 9. 当前已知边界
 

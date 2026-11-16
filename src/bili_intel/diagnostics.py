@@ -24,6 +24,8 @@ def _writable_location(path: Path, *, directory: bool) -> tuple[bool, str]:
         return False, str(target)
     if not directory and path.exists() and path.is_dir():
         return False, str(path)
+    if not directory and path.exists() and not os.access(path, os.W_OK):
+        return False, str(path)
     probe = target
     while not probe.exists() and probe.parent != probe:
         probe = probe.parent
