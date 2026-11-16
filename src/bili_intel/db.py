@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .security import sanitize_metadata
+from .security import SAFE_STAT_FIELDS, sanitize_metadata
 
 
 def utc_now() -> str:
@@ -276,13 +276,20 @@ class Database:
             "share_count", "danmaku_count", "comment_count",
         )
         values = [stats.get(field) for field in fields]
+        raw_items = raw.items() if isinstance(raw, dict) else ()
+        safe_raw = {
+            key: value for key, value in raw_items
+            if key in SAFE_STAT_FIELDS
+            and isinstance(value, (int, float, type(None)))
+            and not isinstance(value, bool)
+        }
         with self.connect() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO video_stats(
                     video_id, captured_at, view_count, like_count, coin_count,
                     favorite_count, share_count, danmaku_count, comment_count, raw_stats_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (video_id, captured_at, *values, json.dumps(raw or {}, ensure_ascii=False, default=str)),
+                (video_id, captured_at, *values, json.dumps(safe_raw, ensure_ascii=False, default=str)),
             )
 
     def get_videos(self, creator_mid: str | None = None, video_id: str | None = None) -> list[sqlite3.Row]:
@@ -414,7 +421,7 @@ class Database:
                          raw_metadata_json=excluded.raw_metadata_json,discovered_at=excluded.discovered_at""",
                     (video_id, part['part_index'], str(part.get('cid')) if part.get('cid') is not None else None,
                      part.get('title') or '', part['url'], part.get('duration_seconds'),
-                     json.dumps(part.get('raw_metadata') or {}, ensure_ascii=False), now),
+                     json.dumps(sanitize_metadata(part.get('raw_metadata')), ensure_ascii=False), now),
                 )
 
     def get_parts(self, video_id: str) -> list[sqlite3.Row]:
@@ -495,7 +502,7 @@ class Database:
                 COALESCE(SUM(prompt_tokens),0) AS prompt_tokens,
                 COALESCE(SUM(completion_tokens),0) AS completion_tokens,
                 COALESCE(SUM(estimated_cost_usd),0.0) AS estimated_cost_usd,
-                SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed_requests,
-                SUM(CASE WHEN estimated_cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_requests
+                COALESCE(SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END),0) AS failed_requests,
+                COALESCE(SUM(CASE WHEN estimated_cost_usd IS NULL THEN 1 ELSE 0 END),0) AS unpriced_requests
                 FROM llm_usage""").fetchone()
             return dict(row)

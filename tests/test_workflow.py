@@ -160,3 +160,13 @@ def test_run_processes_only_this_discovery_not_historical_rows(tmp_path, monkeyp
                      '--no-metadata', '--no-subtitles', '--no-asr', '--no-llm']) == 0
     assert processed == [second]
     assert db.counts()['videos'] == 2
+
+
+def test_process_without_discovered_videos_fails_clearly(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv('BCI_DB_PATH', str(tmp_path / 'state.db'))
+    monkeypatch.setenv('BCI_ARTIFACTS_DIR', str(tmp_path / 'artifacts'))
+    code = cli.main(['process', '--mid', '123'])
+    captured = capsys.readouterr()
+    assert code == 1
+    assert 'No videos found' in captured.err
+    assert 'bci discover' in captured.err

@@ -4,7 +4,7 @@
 
 Authorized creator URL / CSV → video discovery → engagement snapshots → **every accessible video part** (`?p=N`) → source subtitles or cached local faster-whisper → structured, token-budgeted LLM analysis → SQLite with full-text segment search and JSONL export.
 
-[中文说明](README.zh.md) · [Architecture](docs/architecture.md) · [Source policy](docs/source-adapters.md) · [Verification](docs/verification.md) · [Security](SECURITY.md)
+[中文说明](README.zh.md) · [Architecture](docs/architecture.md) · [Source policy](docs/source-adapters.md) · [Verification](docs/verification.md) · [Local runbook](docs/local-runbook.md) · [Engineering review](docs/engineering-review.md) · [Security](SECURITY.md)
 
 > The yt-dlp creator-space extractor uses an **unofficial** Bilibili endpoint. `--authorized-content-use` is an operator declaration, not a grant of rights. Discovery and accessible content may be incomplete, and the project does not bypass access controls or platform safeguards.
 
@@ -18,7 +18,7 @@ python -m pip install -e '.[all,dev]'
 cp .env.example .env
 ```
 
-Set `OPENAI_API_KEY` for LLM analysis, plus any optional `OPENAI_BASE_URL` and `BCI_LLM_MODEL`. faster-whisper is local; for CPU the conservative configuration is `BCI_WHISPER_DEVICE=cpu` and `BCI_WHISPER_COMPUTE_TYPE=int8`. It does not automatically provide Apple MPS acceleration. The default model is `small` and may download weights on first use.
+Set `OPENAI_API_KEY` for LLM analysis, plus any optional `OPENAI_BASE_URL` and `BCI_LLM_MODEL`. faster-whisper is local; for CPU the conservative configuration is `BCI_WHISPER_DEVICE=cpu` and `BCI_WHISPER_COMPUTE_TYPE=int8`. It does not automatically provide Apple MPS acceleration. The default model is `small` and may download weights on first use. Run `bci doctor` before the first real job to check local dependencies and paths; it does not contact Bilibili or an LLM provider.
 
 ```bash
 bci run --space-url 'https://space.bilibili.com/123456/video' \
@@ -32,6 +32,7 @@ bci ingest --space-url 'https://space.bilibili.com/123456/video' \
   --manifest examples/videos.csv
 bci process --mid 123456 --authorized-content-use --limit 10
 
+bci doctor
 bci queue-status
 bci costs
 bci stats

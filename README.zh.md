@@ -4,7 +4,7 @@
 
 输入 UP 主空间链接（或导入已获授权的视频 CSV 清单），建立 SQLite 本地知识库：视频发现 → 统计指标快照 → **全分 P** 字幕/语音转录 → **带时间戳文本** → **Token 感知的结构化 LLM 分析** → 可检索/导出。
 
-[English](README.md) · [工程架构](docs/architecture.md) · [数据源/权限](docs/source-adapters.md) · [验证矩阵](docs/verification.md) · [安全](SECURITY.md)
+[English](README.md) · [工程架构](docs/architecture.md) · [数据源/权限](docs/source-adapters.md) · [验证矩阵](docs/verification.md) · [本地运行手册](docs/local-runbook.md) · [工程审查与路线图](docs/engineering-review.md) · [安全](SECURITY.md)
 
 > **访问权限**：Bilibili 视频发现由 yt-dlp 的非官方 `BilibiliSpaceVideo` 提取器实现，需确保拥有操作/内容处理权限；`--authorized-content-use` 只是操作人的确认，**不代表自动获得平台或创作者授权**。存在平台访问限制、已删除/私密投稿或分 P 不可访问情况。工具不绕过验证码、登录或访问控制；无法保证空间枚举的绝对完整性。
 
@@ -46,6 +46,8 @@ BCI_LLM_TPM=60000
 
 macOS 上的 faster-whisper/CTranslate2 不应被当成 Apple MPS GPU 后端；`cpu + int8` 是保守配置。CUDA 设备可测试 `BCI_WHISPER_DEVICE=cuda` 与 `float16`，但需要正确安装 CTranslate2 的 CUDA/cuDNN 运行环境。首轮 ASR 会下载模型权重。只有 LLM 阶段发送字幕文本到所配置的服务。
 
+安装后先运行 `bci doctor`。该命令只检查本机依赖、SQLite、配置和目录权限，不访问 B站、不调用 LLM，也不会打印密钥。
+
 ## 运行命令
 
 先限定一个已获授权 UP 主的 1 条视频进行真实环境试运行：
@@ -67,6 +69,7 @@ bci discover --space-url 'https://space.bilibili.com/123456/video' \
   --source yt-dlp --authorized-content-use
 bci process --mid 123456 --authorized-content-use --limit 10 \
   --workers 2 --network-workers 1 --asr-workers 1 --llm-workers 2
+bci doctor
 bci queue-status
 bci costs
 bci stats
