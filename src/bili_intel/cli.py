@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import Settings
 from .db import Database
+from .diagnostics import collect_diagnostics
 from .pipeline import process_video
 from .scheduler import run_batch
 from .sources import ManifestSource, YtDlpSpaceSource
@@ -59,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     export = sub.add_parser('export', help='Export a creator summary as JSONL from SQLite')
     export.add_argument('--mid', required=True)
     export.add_argument('--output', required=True, type=Path)
+    sub.add_parser('doctor', help='Check local dependencies and configuration without network access')
     sub.add_parser('stats')
     sub.add_parser('queue-status', help='Print durable task status counts')
     sub.add_parser('costs', help='Print LLM API token usage and estimated costs')
@@ -99,6 +101,11 @@ def _discover(db: Database, args, settings: Settings) -> tuple[str, list[str]]:
 
 
 def _process_rows(db: Database, rows, settings, args) -> None:
+    if not rows:
+        raise ValueError(
+            'No videos found for this creator in the local database. '
+            'Run bci discover or bci ingest first.'
+        )
     for name in ('workers','network_workers','asr_workers','llm_workers'):
         value = getattr(args,name,None)
         if value is not None and value < 1:
@@ -116,10 +123,22 @@ def _process_rows(db: Database, rows, settings, args) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = Settings.from_env()
-    db = Database(settings.db_path)
-    db.initialize()
+    db = None
+    if args.command != 'doctor':
+        db = Database(settings.db_path)
+        db.initialize()
     try:
-        if args.command == 'init-db':
+        if args.command == 'doctor':
+            results = collect_diagnostics(settings)
+            for item in results:
+                print(f"[{item['status'].upper()}] {item['name']}: {item['detail']}")
+            counts = {
+                status: sum(item['status'] == status for item in results)
+                for status in ('ok', 'info', 'warn', 'fail')
+            }
+            print('Doctor summary:', json.dumps(counts, ensure_ascii=False))
+            return 1 if counts['fail'] else 0
+        elif args.command == 'init-db':
             print(f'Initialized: {settings.db_path}')
         elif args.command == 'ingest':
             args.source = 'manifest'

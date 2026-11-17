@@ -7,7 +7,11 @@ SAFE_FIELDS = {
     'duration','categories','tags','category','view_count','like_count',
     'coin_count','favorite_count','share_count','danmaku_count','comment_count',
 }
-SAFE_STAT_FIELDS = {'view','like','coin','favorite','share','danmaku','reply'}
+SAFE_STAT_FIELDS = {
+    'view', 'like', 'coin', 'favorite', 'share', 'danmaku', 'reply',
+    'view_count', 'like_count', 'coin_count', 'favorite_count',
+    'share_count', 'danmaku_count', 'comment_count',
+}
 
 
 def sanitize_metadata(raw: dict | None) -> dict:

@@ -18,3 +18,22 @@ def test_metadata_secret_filtering(tmp_path):
         r=conn.execute('SELECT raw_metadata_json FROM videos').fetchone()
         c=conn.execute('SELECT raw_metadata_json FROM creators').fetchone()
     assert 'SECRET' not in r['raw_metadata_json']+c['raw_metadata_json']
+
+
+def test_raw_stats_are_filtered_before_database_persistence(tmp_path):
+    import json
+
+    db = Database(tmp_path / 'db.sqlite3')
+    db.initialize()
+    db.upsert_creator('1', 'https://space.bilibili.com/1')
+    db.upsert_video({
+        'video_id': 'BV0000000000',
+        'creator_mid': '1',
+        'url': 'https://www.bilibili.com/video/BV0000000000',
+        'stats': {'view_count': 10, 'like_count': 2},
+        'raw_stats': {'view': 10, 'like': 2, 'csrf': 'SECRET', 'access_key': 'SECRET'},
+    })
+    with db.connect() as conn:
+        raw = conn.execute('SELECT raw_stats_json FROM video_stats').fetchone()[0]
+    assert json.loads(raw) == {'view': 10, 'like': 2}
+    assert 'SECRET' not in raw
